@@ -27,7 +27,6 @@ public final class StatusManager {
     private static boolean essentialLedActive = false;
     private static boolean volumeLedActive = false;
     private static int volumeLedLast = 0;
-    private static boolean volumeLedUpdate = false;
 
     private static boolean callLedEnabled = false;
 
@@ -77,14 +76,6 @@ public final class StatusManager {
 
     public static void setVolumeLedLast(int last) {
         volumeLedLast = last;
-    }
-
-    public static boolean isVolumeLedUpdate() {
-        return volumeLedUpdate;
-    }
-
-    public static void setVolumeLedUpdate(boolean status) {
-        volumeLedUpdate = status;
     }
 
     public static boolean isCallLedEnabled() {
