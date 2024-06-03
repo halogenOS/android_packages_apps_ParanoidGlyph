@@ -25,8 +25,8 @@ public final class StatusManager {
     private static boolean animationActive = false;
     private static boolean callLedActive = false;
     private static boolean essentialLedActive = false;
-    private static boolean volumeLedActive = false;
     private static int volumeLedLast = 0;
+    private static int chargingLedLast = 0;
 
     private static boolean callLedEnabled = false;
 
@@ -62,12 +62,12 @@ public final class StatusManager {
         essentialLedActive = status;
     }
 
-    public static boolean isVolumeLedActive() {
-        return volumeLedActive;
+    public static int getChargingLedLast() {
+        return chargingLedLast;
     }
 
-    public static void setVolumeLedActive(boolean status) {
-        volumeLedActive = status;
+    public static void setChargingLedLast(int last) {
+        chargingLedLast = last;
     }
 
     public static int getVolumeLedLast() {
