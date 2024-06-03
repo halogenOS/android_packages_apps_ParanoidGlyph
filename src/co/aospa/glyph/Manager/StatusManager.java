@@ -25,8 +25,12 @@ public final class StatusManager {
     private static boolean animationActive = false;
     private static boolean callLedActive = false;
     private static boolean essentialLedActive = false;
-    private static boolean volumeLedActive = false;
+    private static int chargingLedLast = 0;
+    private static int batteryLevelLast = 0;
+    private static int[] batteryArrayLast;
     private static int volumeLedLast = 0;
+    private static int volumeLevelLast = 0;
+    private static int[] volumeArrayLast;
 
     private static boolean callLedEnabled = false;
 
@@ -62,12 +66,28 @@ public final class StatusManager {
         essentialLedActive = status;
     }
 
-    public static boolean isVolumeLedActive() {
-        return volumeLedActive;
+    public static int getChargingLedLast() {
+        return chargingLedLast;
     }
 
-    public static void setVolumeLedActive(boolean status) {
-        volumeLedActive = status;
+    public static void setChargingLedLast(int last) {
+        chargingLedLast = last;
+    }
+    
+    public static int getBatteryLevelLast() {
+        return batteryLevelLast;
+    }
+
+    public static void setBatteryLevelLast(int batteryLevel) {
+        batteryLevelLast = batteryLevel;
+    }
+
+    public static int[] getBatteryArrayLast() {
+        return batteryArrayLast;
+    }
+
+    public static void setBatteryArrayLast(int[] batteryArray) {
+        batteryArrayLast = batteryArray;
     }
 
     public static int getVolumeLedLast() {
@@ -76,6 +96,22 @@ public final class StatusManager {
 
     public static void setVolumeLedLast(int last) {
         volumeLedLast = last;
+    }
+
+    public static int getVolumeLevelLast() {
+        return volumeLevelLast;
+    }
+
+    public static void setVolumeLevelLast(int volumeLevel) {
+        volumeLevelLast = volumeLevel;
+    }
+
+    public static int[] getVolumeArrayLast() {
+        return volumeArrayLast;
+    }
+
+    public static void setVolumeArrayLast(int[] volumeArray) {
+        volumeArrayLast = volumeArray;
     }
 
     public static boolean isCallLedEnabled() {

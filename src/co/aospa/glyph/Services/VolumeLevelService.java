@@ -38,31 +38,37 @@ public class VolumeLevelService extends Service {
 
     private HandlerThread thread;
     private Handler mThreadHandler;
-    private final Handler AnimationHandler = new Handler();
     private ContentResolver mContentResolver;
     private VolumeObserver mVolumeObserver;
+
+    private AudioManager audioManager;
+    private Runnable dismissVolume = new Runnable() {
+        @Override
+        public void run() {
+            AnimationManager.dismissVolume();
+        }
+    };
 
     @Override
     public void onCreate() {
         if (DEBUG) Log.d(TAG, "Creating service");
         
-        // Run VolumeLevelService on a handler thread
+        // Add a handler thread
         thread = new HandlerThread("VolumeLevelService");
         thread.start();
         Looper looper = thread.getLooper();
         mThreadHandler = new Handler(looper);
+
+        audioManager = (AudioManager) getSystemService(AudioManager.class);
+
+        mContentResolver = getContentResolver();
+        mVolumeObserver = new VolumeObserver();
+        mVolumeObserver.register(mContentResolver);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (DEBUG) Log.d(TAG, "Starting service");
-        
-        mThreadHandler.post(() -> {
-            mContentResolver = getContentResolver();
-            mVolumeObserver = new VolumeObserver();
-            mVolumeObserver.register(mContentResolver);
-        });
-        
         return START_STICKY;
     }
 
@@ -79,8 +85,15 @@ public class VolumeLevelService extends Service {
         return null;
     }
 
+    private int getCurrentVolume() {
+        return audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+    }
+    
+    private int getMaxVolume() {
+        return audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+    }
+
     private class VolumeObserver extends ContentObserver {
-        private AudioManager audioManager;
         private int previousVolume;
 
         public VolumeObserver() {
@@ -88,8 +101,7 @@ public class VolumeLevelService extends Service {
         }
 
         public void register(ContentResolver cr) {
-            audioManager = (AudioManager) getSystemService(AudioManager.class);
-            previousVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            previousVolume = getCurrentVolume();
             cr.registerContentObserver(
                 android.provider.Settings.System.CONTENT_URI,
                 true,
@@ -104,19 +116,27 @@ public class VolumeLevelService extends Service {
         public void onChange(boolean selfChange, Uri uri) {
             super.onChange(selfChange, uri);
 
-            int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-            int minVolume = audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC);
-            int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int delta = previousVolume - currentVolume;
+            int delta = previousVolume - getCurrentVolume();
 
-            if (delta > 0) {
-                if (DEBUG) Log.d(TAG, "Decreased: " + (int) (Math.floor(100D / maxVolume * currentVolume)));
-                AnimationManager.playVolume(AnimationHandler, (int) (Math.floor(100D / maxVolume * currentVolume)), false, false, true);
-            } else if (delta < 0) {
-                if (DEBUG) Log.d(TAG, "Increased: " + (int) (Math.floor(100D / maxVolume * currentVolume)));
-                AnimationManager.playVolume(AnimationHandler, (int) (Math.floor(100D / maxVolume * currentVolume)), false, true, false);
+            if (delta != 0) {
+                if (mThreadHandler.hasCallbacks(dismissVolume))
+                    mThreadHandler.removeCallbacks(dismissVolume);
+
+                if (delta < 0) {
+                    if (DEBUG) Log.d(TAG, "Increased: " + (int) (Math.floor(100D / getMaxVolume() * getCurrentVolume())));
+                    mThreadHandler.post(() -> {
+                        AnimationManager.playVolume((int) (Math.floor(100D / getMaxVolume() * getCurrentVolume())), false, true, false);
+                    });
+                } else if (delta > 0) {
+                    if (DEBUG) Log.d(TAG, "Decreased: " + (int) (Math.floor(100D / getMaxVolume() * getCurrentVolume())));
+                    mThreadHandler.post(() -> {
+                        AnimationManager.playVolume((int) (Math.floor(100D / getMaxVolume() * getCurrentVolume())), false, false, true);
+                    });
+                }
+
+                mThreadHandler.postDelayed(dismissVolume, 3000);
+                previousVolume = getCurrentVolume();
             }
-            if (delta != 0) previousVolume=currentVolume;
         }
     }
 }
