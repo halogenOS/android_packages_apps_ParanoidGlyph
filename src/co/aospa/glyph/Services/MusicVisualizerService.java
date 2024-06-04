@@ -24,6 +24,10 @@ import android.media.audiofx.Visualizer;
 import android.os.IBinder;
 import android.util.Log;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import co.aospa.glyph.Manager.AnimationManager;
 
 public class MusicVisualizerService extends Service {
@@ -46,6 +50,11 @@ public class MusicVisualizerService extends Service {
     private static final int MID_FREQUENCY = 1500;
     private static final int MID_HIGH_FREQUENCY = 5000;
     private static final int HIGH_FREQUENCY = 10000;
+
+    private static Future<?> submit(Runnable runnable) {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        return executorService.submit(runnable);
+    }
 
     @Override
     public void onCreate() {
@@ -72,7 +81,7 @@ public class MusicVisualizerService extends Service {
                         Visualizer visualizer, byte[] fft, int samplingRate) {
                     if (mAudioManager.isMusicActive()) {
                         if (DEBUG) Log.d(TAG, "Music is active");
-                        processAudioFFT(fft);
+			processAudioFFT(fft);
                     }
                 }
             }, Visualizer.getMaxCaptureRate() / 2, false, true
@@ -114,158 +123,171 @@ public class MusicVisualizerService extends Service {
     }
 
     private void processAudioFFT(byte[] audioBytes) {
-        // The first byte is the DC component of the FFT result (real only)
-        int energySum = Math.abs(audioBytes[0]);
+        submit(() -> {
+            // The first byte is the DC component of the FFT result (real only)
+            int energySum = Math.abs(audioBytes[0]);
 
-        // Calculate the average instantaneous energy of the low frequency band
-        int k = 2;
-        double captureSize = mVisualizer.getCaptureSize() / 2.0;
-        int sampleRate = mVisualizer.getSamplingRate() / 2000;
-        double nextFrequency = (k / 2.0 * sampleRate) / captureSize;
+            // Calculate the average instantaneous energy of the low frequency band
+            int k = 2;
+            double captureSize = mVisualizer.getCaptureSize() / 2.0;
+            int sampleRate = mVisualizer.getSamplingRate() / 2000;
+            double nextFrequency = (k / 2.0 * sampleRate) / captureSize;
 
-        // Sum the energy in the low frequency band
-        while (nextFrequency < LOW_FREQUENCY) {
-            // Calculate the energy of the current frequency
-            energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
+            // Waiting period to light up the leds
+    	    int wait = 132;
 
-            // Increment the frequency index
-            k += 2;
-            nextFrequency = (k / 2.0 * sampleRate) / captureSize;
-        }
+	    try {
+                // Sum the energy in the low frequency band
+                while (nextFrequency < LOW_FREQUENCY) {
+                    // Calculate the energy of the current frequency
+                    energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
 
-        // Calculate the average energy in the low frequency band
-        double sampleAvgAudioEnergy = energySum / (k / 2.0);
+                    // Increment the frequency index
+                    k += 2;
+                    nextFrequency = (k / 2.0 * sampleRate) / captureSize;
+                }
 
-        // Accumulate the low frequency band energy over time
-        mRunningSoundAvg[0] += sampleAvgAudioEnergy;
+                // Calculate the average energy in the low frequency band
+                double sampleAvgAudioEnergy = energySum / (k / 2.0);
 
-        // Check for a beat in the low frequency band
-        // A beat occurs when the average sound energy of a sample is greater than
-        // the average sound energy of a one second part of a song
-        // Also make sure the mCurrentAvgEnergy has been set, otherwise its -1 before its first pass
-        if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[0]) && (mCurrentAvgEnergyOneSec[0] > 0) ) {
-            if (DEBUG) Log.d(TAG, "Low frequency band beat detected");
-            AnimationManager.playMusic("low");
-        }
+                // Accumulate the low frequency band energy over time
+                mRunningSoundAvg[0] += sampleAvgAudioEnergy;
 
-        energySum = 0;
+                // Check for a beat in the low frequency band
+                // A beat occurs when the average sound energy of a sample is greater than
+                // the average sound energy of a one second part of a song
+                // Also make sure the mCurrentAvgEnergy has been set, otherwise its -1 before its first pass
+                if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[0]) && (mCurrentAvgEnergyOneSec[0] > 0) ) {
+                    if (DEBUG) Log.d(TAG, "Low frequency band beat detected");
+        	    AnimationManager.playMusic("low");
+    		    Thread.sleep(wait);
+                }
 
-        // Sum the energy in the mid-low frequency band
-        while (nextFrequency < MID_LOW_FREQUENCY) {
-            // Calculate the energy of the current frequency
-            energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
+                energySum = 0;
 
-            // Increment the frequency index
-            k += 2;
-            nextFrequency = (k / 2.0 * sampleRate) / captureSize;
-        }
+                // Sum the energy in the mid-low frequency band
+                while (nextFrequency < MID_LOW_FREQUENCY) {
+                    // Calculate the energy of the current frequency
+                    energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
 
-        // Calculate the average energy in the mid-low frequency band
-        sampleAvgAudioEnergy = energySum / (k / 2.0);
+                    // Increment the frequency index
+                    k += 2;
+                    nextFrequency = (k / 2.0 * sampleRate) / captureSize;
+                }
 
-        // Accumulate the mid low frequency band energy over time
-        mRunningSoundAvg[1] += sampleAvgAudioEnergy;
+                // Calculate the average energy in the mid-low frequency band
+                sampleAvgAudioEnergy = energySum / (k / 2.0);
 
-        // Check for a beat in the mid-low frequency band
-        if((sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[1]) && (mCurrentAvgEnergyOneSec[1] > 0)) {
-            if (DEBUG) Log.d(TAG, "Mid-low frequency band beat detected");
-            AnimationManager.playMusic("mid_low");
-        }
+                // Accumulate the mid low frequency band energy over time
+                mRunningSoundAvg[1] += sampleAvgAudioEnergy;
 
-        energySum = 0;
+                // Check for a beat in the mid-low frequency band
+                if ((sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[1]) && (mCurrentAvgEnergyOneSec[1] > 0)) {
+                    if (DEBUG) Log.d(TAG, "Mid-low frequency band beat detected");
+        	    AnimationManager.playMusic("mid_low");
+    		    Thread.sleep(wait);
+                }
 
-        // Sum the energy in the mid frequency band
-        while (nextFrequency < MID_FREQUENCY) {
-            // Calculate the energy of the current frequency
-            energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
+                energySum = 0;
 
-            // Increment the frequency index
-            k += 2;
-            nextFrequency = (k / 2.0 * sampleRate) / captureSize;
-        }
+                // Sum the energy in the mid frequency band
+                while (nextFrequency < MID_FREQUENCY) {
+                    // Calculate the energy of the current frequency
+                    energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
 
-        // Calculate the average energy in the mid frequency band
-        sampleAvgAudioEnergy = energySum / (k / 2.0);
+                    // Increment the frequency index
+                    k += 2;
+                    nextFrequency = (k / 2.0 * sampleRate) / captureSize;
+                }
 
-        // Accumulate the mid frequency band energy over time
-        mRunningSoundAvg[2] += sampleAvgAudioEnergy;
+                // Calculate the average energy in the mid frequency band
+                sampleAvgAudioEnergy = energySum / (k / 2.0);
 
-        // Check for a beat in the mid frequency band
-        if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[2]) && (mCurrentAvgEnergyOneSec[2] > 0) ) {
-            if (DEBUG) Log.d(TAG, "Mid frequency band beat detected");
-            AnimationManager.playMusic("mid");
-        }
+                // Accumulate the mid frequency band energy over time
+                mRunningSoundAvg[2] += sampleAvgAudioEnergy;
 
-        energySum = 0;
+                // Check for a beat in the mid frequency band
+                if ((sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[2]) && (mCurrentAvgEnergyOneSec[2] > 0)) {
+                    if (DEBUG) Log.d(TAG, "Mid frequency band beat detected");
+                    AnimationManager.playMusic("mid");
+    		    Thread.sleep(wait);
+                }
 
-        // Sum the energy in the mid-high frequency band
-        while (nextFrequency < MID_HIGH_FREQUENCY) {
-            // Calculate the energy of the current frequency
-            energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
+                energySum = 0;
 
-            // Increment the frequency index
-            k += 2;
-            nextFrequency = (k / 2.0 * sampleRate) / captureSize;
-        }
+                // Sum the energy in the mid-high frequency band
+                while (nextFrequency < MID_HIGH_FREQUENCY) {
+                    // Calculate the energy of the current frequency
+                    energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
 
-        // Calculate the average energy in the mid-high frequency band
-        sampleAvgAudioEnergy = energySum / (k / 2.0);
+                    // Increment the frequency index
+                    k += 2;
+                    nextFrequency = (k / 2.0 * sampleRate) / captureSize;
+                }
 
-        // Accumulate the mid high-frequency band energy over time
-        mRunningSoundAvg[3] += sampleAvgAudioEnergy;
+                // Calculate the average energy in the mid-high frequency band
+                sampleAvgAudioEnergy = energySum / (k / 2.0);
 
-        // Check for a beat in the mid-high frequency band
-        if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[3]) && (mCurrentAvgEnergyOneSec[3] > 0) ) {
-            if (DEBUG) Log.d(TAG, "Mid-high frequency band beat detected");
-            AnimationManager.playMusic("mid_high");
-        }
+                // Accumulate the mid high-frequency band energy over time
+                mRunningSoundAvg[3] += sampleAvgAudioEnergy;
 
-        // Second Byte: Only imaginary part of the last frequency (include in highs)
-        energySum = Math.abs(audioBytes[1]);
+                // Check for a beat in the mid-high frequency band
+                if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[3]) && (mCurrentAvgEnergyOneSec[3] > 0) ) {
+                    if (DEBUG) Log.d(TAG, "Mid-high frequency band beat detected");
+        	    AnimationManager.playMusic("mid_high");
+    		    Thread.sleep(wait);
+                }
 
-        // Sum the energy in the high frequency band
-        while (nextFrequency < HIGH_FREQUENCY) {
-            // Calculate the energy of the current frequency
-            energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
+                // Second Byte: Only imaginary part of the last frequency (include in highs)
+                energySum = Math.abs(audioBytes[1]);
 
-            // Increment the frequency index
-            k += 2;
-            nextFrequency = (k / 2.0 * sampleRate) / captureSize;
-        }
+                // Sum the energy in the high frequency band
+                while (nextFrequency < HIGH_FREQUENCY) {
+                    // Calculate the energy of the current frequency
+                    energySum += Math.sqrt(audioBytes[k] * audioBytes[k] + audioBytes[k + 1] * audioBytes[k + 1]);
 
-        // Calculate the average energy in the high frequency band
-        sampleAvgAudioEnergy = energySum / (k / 2.0);
+                    // Increment the frequency index
+                    k += 2;
+                    nextFrequency = (k / 2.0 * sampleRate) / captureSize;
+                }
 
-        // Accumulate the high frequency band energy over time
-        mRunningSoundAvg[4] += sampleAvgAudioEnergy;
+                // Calculate the average energy in the high frequency band
+                sampleAvgAudioEnergy = energySum / (k / 2.0);
 
-        // Check for a beat in the high frequency band
-        if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[4]) && (mCurrentAvgEnergyOneSec[4] > 0) ) {
-            if (DEBUG) Log.d(TAG, "High frequency band beat detected");
-            AnimationManager.playMusic("high");
-        }
+                // Accumulate the high frequency band energy over time
+                mRunningSoundAvg[4] += sampleAvgAudioEnergy;
 
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - mSystemTimeStartSec >= 1000) {
-            mCurrentAvgEnergyOneSec[0] = mRunningSoundAvg[0] / mNumberOfSamplesInOneSec;
-            mCurrentAvgEnergyOneSec[1] = mRunningSoundAvg[1] / mNumberOfSamplesInOneSec;
-            mCurrentAvgEnergyOneSec[2] = mRunningSoundAvg[2] / mNumberOfSamplesInOneSec;
-            mCurrentAvgEnergyOneSec[3] = mRunningSoundAvg[3] / mNumberOfSamplesInOneSec;
-            mCurrentAvgEnergyOneSec[4] = mRunningSoundAvg[4] / mNumberOfSamplesInOneSec;
+                // Check for a beat in the high frequency band
+                if( (sampleAvgAudioEnergy >  mCurrentAvgEnergyOneSec[4]) && (mCurrentAvgEnergyOneSec[4] > 0) ) {
+                    if (DEBUG) Log.d(TAG, "High frequency band beat detected");
+        	    AnimationManager.playMusic("high");
+    		    Thread.sleep(wait);
+                }
+	    } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+	    }
+
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - mSystemTimeStartSec >= 1000) {
+                mCurrentAvgEnergyOneSec[0] = mRunningSoundAvg[0] / mNumberOfSamplesInOneSec;
+                mCurrentAvgEnergyOneSec[1] = mRunningSoundAvg[1] / mNumberOfSamplesInOneSec;
+                mCurrentAvgEnergyOneSec[2] = mRunningSoundAvg[2] / mNumberOfSamplesInOneSec;
+                mCurrentAvgEnergyOneSec[3] = mRunningSoundAvg[3] / mNumberOfSamplesInOneSec;
+                mCurrentAvgEnergyOneSec[4] = mRunningSoundAvg[4] / mNumberOfSamplesInOneSec;
 
 
-            // Reset the running energy sum and sample count
-            mRunningSoundAvg[0] = 0;
-            mRunningSoundAvg[1] = 0;
-            mRunningSoundAvg[2] = 0;
-            mRunningSoundAvg[3] = 0;
-            mRunningSoundAvg[4] = 0;
-            mNumberOfSamplesInOneSec = 0;
+                // Reset the running energy sum and sample count
+                mRunningSoundAvg[0] = 0;
+                mRunningSoundAvg[1] = 0;
+                mRunningSoundAvg[2] = 0;
+                mRunningSoundAvg[3] = 0;
+                mRunningSoundAvg[4] = 0;
+                mNumberOfSamplesInOneSec = 0;
 
-            // Update the start time for the next one-second interval
-            mSystemTimeStartSec = currentTime;
-        }
-        mNumberOfSamplesInOneSec++;
-
+                // Update the start time for the next one-second interval
+                mSystemTimeStartSec = currentTime;
+            }
+            mNumberOfSamplesInOneSec++;
+        });
     }
 }
