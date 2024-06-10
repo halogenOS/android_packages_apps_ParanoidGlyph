@@ -56,6 +56,10 @@
         </service>
 
         <service
+            android:name=".Services.PowershareService">
+        </service>
+
+        <service
             android:name=".Services.FlipToGlyphService">
         </service>
 
