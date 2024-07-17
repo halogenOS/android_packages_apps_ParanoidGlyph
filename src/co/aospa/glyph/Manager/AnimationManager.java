@@ -349,7 +349,7 @@ public final class AnimationManager {
 
             try {
                 updateLedFrame(pattern);
-                Thread.sleep(52,90000);
+                Thread.sleep(85);
             } catch (Exception e) {
                 if (DEBUG) Log.d(TAG, "Exception while playing animation | name: music: " + name + " | exception: " + e);
             } finally {
