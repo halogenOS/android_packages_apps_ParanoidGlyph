@@ -29,6 +29,9 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.BatteryManager;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -38,6 +41,9 @@ public class ChargingService extends Service {
 
     private static final String TAG = "GlyphChargingService";
     private static final boolean DEBUG = true;
+
+    private HandlerThread thread;
+    private Handler mThreadHandler;
 
     private BatteryManager mBatteryManager;
     private SensorManager mSensorManager;
@@ -51,6 +57,12 @@ public class ChargingService extends Service {
     @Override
     public void onCreate() {
         if (DEBUG) Log.d(TAG, "Creating service");
+        
+        // Run ChargingService on a handler thread
+        thread = new HandlerThread("ChargingService");
+        thread.start();
+        Looper looper = thread.getLooper();
+        mThreadHandler = new Handler(looper);
 
         mBatteryManager = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -58,10 +70,12 @@ public class ChargingService extends Service {
 
         mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
-        IntentFilter powerMonitor = new IntentFilter();
-        powerMonitor.addAction(Intent.ACTION_POWER_CONNECTED);
-        powerMonitor.addAction(Intent.ACTION_POWER_DISCONNECTED);
-        registerReceiver(mPowerMonitor, powerMonitor);
+        mThreadHandler.post(() -> {
+            IntentFilter powerMonitor = new IntentFilter();
+            powerMonitor.addAction(Intent.ACTION_POWER_CONNECTED);
+            powerMonitor.addAction(Intent.ACTION_POWER_DISCONNECTED);
+            registerReceiver(mPowerMonitor, powerMonitor);
+        });
     }
 
     @Override
@@ -75,6 +89,7 @@ public class ChargingService extends Service {
         if (DEBUG) Log.d(TAG, "Destroying service");
         this.unregisterReceiver(mPowerMonitor);
         onPowerDisconnected();
+        thread.quit();
         super.onDestroy();
     }
 
@@ -101,7 +116,7 @@ public class ChargingService extends Service {
     }
 
     private void playChargingAnimation(boolean wait) {
-        AnimationManager.playCharging(getBatteryLevel(), wait);
+        AnimationManager.playCharging(mThreadHandler, getBatteryLevel(), wait);
     }
 
     private final BroadcastReceiver mPowerMonitor = new BroadcastReceiver() {

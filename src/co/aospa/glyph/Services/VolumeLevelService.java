@@ -38,7 +38,6 @@ public class VolumeLevelService extends Service {
 
     private HandlerThread thread;
     private Handler mThreadHandler;
-    private final Handler AnimationHandler = new Handler();
     private ContentResolver mContentResolver;
     private VolumeObserver mVolumeObserver;
 
@@ -51,18 +50,17 @@ public class VolumeLevelService extends Service {
         thread.start();
         Looper looper = thread.getLooper();
         mThreadHandler = new Handler(looper);
-    }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (DEBUG) Log.d(TAG, "Starting service");
-        
         mThreadHandler.post(() -> {
             mContentResolver = getContentResolver();
             mVolumeObserver = new VolumeObserver();
             mVolumeObserver.register(mContentResolver);
         });
-        
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (DEBUG) Log.d(TAG, "Starting service");  
         return START_STICKY;
     }
 
@@ -111,10 +109,10 @@ public class VolumeLevelService extends Service {
 
             if (delta > 0) {
                 if (DEBUG) Log.d(TAG, "Decreased: " + (int) (Math.floor(100D / maxVolume * currentVolume)));
-                AnimationManager.playVolume(AnimationHandler, (int) (Math.floor(100D / maxVolume * currentVolume)), false, false, true);
+                AnimationManager.playVolume(mThreadHandler, (int) (Math.floor(100D / maxVolume * currentVolume)), false, false, true);
             } else if (delta < 0) {
                 if (DEBUG) Log.d(TAG, "Increased: " + (int) (Math.floor(100D / maxVolume * currentVolume)));
-                AnimationManager.playVolume(AnimationHandler, (int) (Math.floor(100D / maxVolume * currentVolume)), false, true, false);
+                AnimationManager.playVolume(mThreadHandler, (int) (Math.floor(100D / maxVolume * currentVolume)), false, true, false);
             }
             if (delta != 0) previousVolume=currentVolume;
         }
