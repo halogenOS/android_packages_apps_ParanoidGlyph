@@ -198,7 +198,7 @@ public final class AnimationManager {
                         volumeArray[i] = Constants.getBrightness();
 		    }
                     updateLedFrame(volumeArray);
-                    Thread.sleep(17);
+                    Thread.sleep(16);
                 }
                 long start = System.currentTimeMillis();
                 while (System.currentTimeMillis() - start <= 1800) {
