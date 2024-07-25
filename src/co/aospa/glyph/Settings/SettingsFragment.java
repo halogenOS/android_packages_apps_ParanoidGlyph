@@ -19,8 +19,6 @@
 package co.aospa.glyph.Settings;
 
 import android.content.ContentResolver;
-import android.content.SharedPreferences;
-import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Bundle;
@@ -32,7 +30,6 @@ import androidx.preference.Preference;
 import androidx.preference.Preference.OnPreferenceChangeListener;
 import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceFragment;
-import androidx.preference.PreferenceManager;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreference;
 
@@ -46,7 +43,7 @@ import co.aospa.glyph.Manager.SettingsManager;
 import co.aospa.glyph.Utils.ServiceUtils;
 
 public class SettingsFragment extends PreferenceFragment implements OnPreferenceChangeListener,
-        OnMainSwitchChangeListener, OnSharedPreferenceChangeListener {
+        OnMainSwitchChangeListener {
 
     private MainSwitchPreference mSwitchBar;
 
@@ -67,8 +64,6 @@ public class SettingsFragment extends PreferenceFragment implements OnPreference
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         addPreferencesFromResource(R.xml.glyph_settings);
-
-        PreferenceManager.getDefaultSharedPreferences(Constants.CONTEXT).registerOnSharedPreferenceChangeListener(this);
 
         mContentResolver = getActivity().getContentResolver();
         mSettingObserver = new SettingObserver();
@@ -185,24 +180,7 @@ public class SettingsFragment extends PreferenceFragment implements OnPreference
     }
 
     @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        if (key.equals(Constants.GLYPH_MUSIC_VISUALIZER_ENABLE)) {
-            boolean isChecked = SettingsManager.isGlyphMusicVisualizerEnabled();
-            mMusicVisualizerPreference.setChecked(isChecked);
-            mFlipPreference.setEnabled(!isChecked);
-            mNotifsPreference.setEnabled(!isChecked);
-            mNotifsPreference.setSwitchEnabled(!isChecked);
-            mCallPreference.setEnabled(!isChecked);
-            mCallPreference.setSwitchEnabled(!isChecked);
-            mChargingLevelPreference.setEnabled(!isChecked);
-            mVolumeLevelPreference.setEnabled(!isChecked);
-            mChargingPowersharePreference.setEnabled(!isChecked);
-        }
-    }
-
-    @Override
     public void onDestroy() {
-        PreferenceManager.getDefaultSharedPreferences(Constants.CONTEXT).registerOnSharedPreferenceChangeListener(this);
         mSettingObserver.unregister(mContentResolver);
         super.onDestroy();
     }
@@ -213,8 +191,6 @@ public class SettingsFragment extends PreferenceFragment implements OnPreference
         }
 
         public void register(ContentResolver cr) {
-            cr.registerContentObserver(Settings.Secure.getUriFor(
-                Constants.GLYPH_ENABLE), false, this);
             cr.registerContentObserver(Settings.Secure.getUriFor(
                 Constants.GLYPH_CALL_ENABLE), false, this);
             cr.registerContentObserver(Settings.Secure.getUriFor(
@@ -228,9 +204,6 @@ public class SettingsFragment extends PreferenceFragment implements OnPreference
         @Override
         public void onChange(boolean selfChange, Uri uri) {
             super.onChange(selfChange, uri);
-            if (uri.equals(Settings.Secure.getUriFor(Constants.GLYPH_ENABLE))) {
-                mSwitchBar.setChecked(SettingsManager.isGlyphEnabled());
-            }
             if (uri.equals(Settings.Secure.getUriFor(Constants.GLYPH_CALL_ENABLE))) {
                 mCallPreference.setChecked(SettingsManager.isGlyphCallEnabled());
             }

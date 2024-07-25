@@ -39,8 +39,7 @@ public class TileActivity extends Activity {
         ComponentName sourceClass = getIntent().getParcelableExtra(Intent.EXTRA_COMPONENT_NAME);
         if (DEBUG) Log.d(TAG, "sourceClass: " + sourceClass.getClassName());
         if (sourceClass.getClassName().equals("co.aospa.glyph.Tiles.GlyphTileService")
-            || sourceClass.getClassName().equals("co.aospa.glyph.Tiles.TorchTileService")
-            || sourceClass.getClassName().equals("co.aospa.glyph.Tiles.MusicVisualizerTileService")) {
+            || sourceClass.getClassName().equals("co.aospa.glyph.Tiles.TorchTileService")) {
             openActivitySafely(new Intent(this, SettingsActivity.class));
         } else {
             finish();
