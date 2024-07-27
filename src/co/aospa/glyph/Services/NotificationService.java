@@ -26,9 +26,7 @@ import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.database.ContentObserver;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.preference.PreferenceManager;
@@ -54,9 +52,6 @@ public class NotificationService extends NotificationListenerService
     private PowerManager mPowerManager;
     private WakeLock mWakeLock;
 
-    private HandlerThread thread;
-    private Handler mThreadHandler;
-
     private ContentResolver mContentResolver;
     private SettingObserver mSettingObserver;
 
@@ -65,34 +60,21 @@ public class NotificationService extends NotificationListenerService
     @Override
     public void onCreate() {
         if (DEBUG) Log.d(TAG, "Creating service");
-        
-        // Run NotificationService on a handler thread
-        thread = new HandlerThread("NotificationService");
-        thread.start();
-        Looper looper = thread.getLooper();
-        mThreadHandler = new Handler(looper);
-        
         mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         mWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
+        mContentResolver = getContentResolver();
+        mSettingObserver = new SettingObserver();
+        mSettingObserver.register(mContentResolver);
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         mSharedPreferences.registerOnSharedPreferenceChangeListener(this);
-
-        mThreadHandler.post(() -> {
-            mContentResolver = getContentResolver();
-            mSettingObserver = new SettingObserver();
-            mSettingObserver.register(mContentResolver);
-        });
-
         super.onCreate();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (DEBUG) Log.d(TAG, "Starting service");
-        mThreadHandler.post(() -> {
-            onNotificationUpdated();
-        });
+        onNotificationUpdated();
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -102,7 +84,6 @@ public class NotificationService extends NotificationListenerService
         AnimationManager.stopEssential();
         mSharedPreferences.unregisterOnSharedPreferenceChangeListener(this);
         mSettingObserver.unregister(mContentResolver);
-        thread.quit();
         super.onDestroy();
     }
 

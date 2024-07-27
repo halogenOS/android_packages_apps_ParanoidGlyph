@@ -23,9 +23,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.os.IBinder;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.util.Log;
@@ -41,9 +38,6 @@ public class FlipToGlyphService extends Service {
     private boolean isFlipped;
     private int ringerMode;
 
-    private HandlerThread thread;
-    private Handler mThreadHandler;
-
     private AudioManager mAudioManager;
     private FlipToGlyphSensor mFlipToGlyphSensor;
     private PowerManager mPowerManager;
@@ -52,29 +46,19 @@ public class FlipToGlyphService extends Service {
     @Override
     public void onCreate() {
         if (DEBUG) Log.d(TAG, "Creating service");
-        
-        // Run FlipToGlyphService on a handler thread
-        thread = new HandlerThread("FlipToGlyphService");
-        thread.start();
-        Looper looper = thread.getLooper();
-        mThreadHandler = new Handler(looper);
+
+        mFlipToGlyphSensor = new FlipToGlyphSensor(this, this::onFlip);
 
         mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
         mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         mWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
-        
-        mThreadHandler.post(() -> {
-            mFlipToGlyphSensor = new FlipToGlyphSensor(this, this::onFlip);
-        });
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (DEBUG) Log.d(TAG, "Starting service");
-        mThreadHandler.post(() -> {
-            mFlipToGlyphSensor.enable();
-        });
+        mFlipToGlyphSensor.enable();
         return START_STICKY;
     }
 
@@ -82,7 +66,6 @@ public class FlipToGlyphService extends Service {
     public void onDestroy() {
         if (DEBUG) Log.d(TAG, "Destroying service");
         mFlipToGlyphSensor.disable();
-        thread.quit();
         super.onDestroy();
     }
 

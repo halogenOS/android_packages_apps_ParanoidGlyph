@@ -24,6 +24,9 @@ import com.android.internal.util.ArrayUtils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import co.aospa.glyph.Constants.Constants;
 import co.aospa.glyph.Utils.FileUtils;
@@ -33,6 +36,11 @@ public final class AnimationManager {
 
     private static final String TAG = "GlyphAnimationManager";
     private static final boolean DEBUG = true;
+
+    private static Future<?> submit(Runnable runnable) {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        return executorService.submit(runnable);
+    }
 
     private static boolean check(String name, boolean wait) {
         if (DEBUG) Log.d(TAG, "Playing animation | name: " + name + " | waiting: " + Boolean.toString(wait));
@@ -48,7 +56,7 @@ public final class AnimationManager {
         }
 
         if (StatusManager.isAnimationActive()) {
-            long start = System.currentTimeMillis();
+            long start = System.currentTimeMillis();  
             if (wait) {
                 if (DEBUG) Log.d(TAG, "There is already an animation playing, wait | name: " + name);
                 while (StatusManager.isAnimationActive()) {
@@ -77,94 +85,94 @@ public final class AnimationManager {
     }
 
     public static void playCsv(String name, boolean wait) {
-        if (!check(name, wait))
+        submit(() -> {
+            if (!check(name, wait))
                 return;
 
-        StatusManager.setAnimationActive(true);
+            StatusManager.setAnimationActive(true);
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                ResourceUtils.getAnimation(name)))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (checkInterruption("csv")) throw new InterruptedException();
-                line = line.replace(" ", "");
-                line = line.endsWith(",") ? line.substring(0, line.length() - 1) : line;
-                String[] pattern = line.split(",");
-                if (ArrayUtils.contains(Constants.getSupportedAnimationPatternLengths(), pattern.length)) {
-                    updateLedFrame(pattern);
-                } else {
-                    if (DEBUG) Log.d(TAG, "Animation line length mismatch | name: " + name + " | line: " + line);
-                    throw new InterruptedException();
-                }
-                Thread.sleep(17);
-            }
-        } catch (Exception e) {
-            if (DEBUG) Log.d(TAG, "Exception while playing animation | name: " + name + " | exception: " + e);
-        } finally {
-            updateLedFrame(new float[5]);
-            StatusManager.setAnimationActive(false);
-            if (DEBUG) Log.d(TAG, "Done playing animation | name: " + name);
-        }
-    }
-
-    public static void playCharging(Handler mHandler, int batteryLevel, boolean wait) {
-        if (!check("charging", wait))
-                return;
-
-        StatusManager.setAnimationActive(true);
-
-        boolean batteryDot = ResourceUtils.getBoolean("glyph_settings_battery_dot");
-        int[] batteryArray = new int[ResourceUtils.getInteger("glyph_settings_battery_levels_num")];
-        int amount = (int) (Math.floor((batteryLevel / 100.0) * (batteryArray.length - (batteryDot ? 2 : 1))) + (batteryDot ? 2 : 1));
-
-        if (mHandler.hasMessages(0))
-            mHandler.removeCallbacksAndMessages(null);
-
-        try {
-            for (int i = 0; i < batteryArray.length; i++) {
-                if ( i <= amount - 1 && batteryLevel > 0) {
-                    if (checkInterruption("charging")) throw new InterruptedException();
-                    batteryArray[i] = Constants.getBrightness();
-                    if (batteryDot && i == 0) continue;
-                    updateLedFrame(batteryArray);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    ResourceUtils.getAnimation(name)))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (checkInterruption("csv")) throw new InterruptedException();
+                    line = line.replace(" ", "");
+                    line = line.endsWith(",") ? line.substring(0, line.length() - 1) : line;
+                    String[] pattern = line.split(",");
+                    if (ArrayUtils.contains(Constants.getSupportedAnimationPatternLengths(), pattern.length)) {
+                        updateLedFrame(pattern);
+                    } else {
+                        if (DEBUG) Log.d(TAG, "Animation line length mismatch | name: " + name + " | line: " + line);
+                        throw new InterruptedException();
+                    }
                     Thread.sleep(17);
                 }
+            } catch (Exception e) {
+                if (DEBUG) Log.d(TAG, "Exception while playing animation | name: " + name + " | exception: " + e);
+            } finally {
+                updateLedFrame(new float[5]);
+                StatusManager.setAnimationActive(false);
+                if (DEBUG) Log.d(TAG, "Done playing animation | name: " + name);
             }
-            mHandler.postDelayed(() -> {
-                try {
-                    if (checkInterruption("charging")) throw new InterruptedException();
-                    for (int i = batteryArray.length - 1; i >= 0; i--) {
-                        if ( i <= amount - 1 && batteryLevel > 0) {
-                            if (checkInterruption("charging")) throw new InterruptedException();
-                            if (batteryArray[i] != 0) {
-                                batteryArray[i] = 0;
-                                updateLedFrame(batteryArray);
-                                Thread.sleep(17);
-                            }
-                        }
-                    }
-                } catch (InterruptedException e) {
-                    if (DEBUG) Log.d(TAG, "Exception while playing animation, interrupted | name: charging");
-                    if (!StatusManager.isAllLedActive()) {
-                        updateLedFrame(new int[batteryArray.length]);
+        });
+    }
+
+    public static void playCharging(int batteryLevel, boolean wait) {
+        submit(() -> {
+            if (!check("charging", wait))
+                return;
+
+            StatusManager.setAnimationActive(true);
+
+            boolean batteryDot = ResourceUtils.getBoolean("glyph_settings_battery_dot");
+            int[] batteryArray = new int[ResourceUtils.getInteger("glyph_settings_battery_levels_num")];
+            int amount = (int) (Math.floor((batteryLevel / 100.0) * (batteryArray.length - (batteryDot ? 2 : 1))) + (batteryDot ? 2 : 1));
+
+            try {
+                for (int i = 0; i < batteryArray.length; i++) {
+                    if ( i <= amount - 1 && batteryLevel > 0) {
+                        if (checkInterruption("charging")) throw new InterruptedException();
+                        batteryArray[i] = Constants.getBrightness();
+                        if (batteryDot && i == 0) continue;
+                        updateLedFrame(batteryArray);
+                        Thread.sleep(17);
                     }
                 }
-            }, 1000);
-        } catch (InterruptedException e) {
-            if (DEBUG) Log.d(TAG, "Exception while playing animation, interrupted | name: charging");
-            if (!StatusManager.isAllLedActive()) {
-                updateLedFrame(new int[batteryArray.length]);
+                long start = System.currentTimeMillis();
+                while (System.currentTimeMillis() - start <= 1000) {
+                    if (checkInterruption("charging")) throw new InterruptedException();
+                }
+                for (int i = batteryArray.length - 1; i >= 0; i--) {
+                    if ( i <= amount - 1 && batteryLevel > 0) {
+                        if (checkInterruption("charging")) throw new InterruptedException();
+                        if (batteryArray[i] != 0) {
+                            batteryArray[i] = 0;
+                            updateLedFrame(batteryArray);
+                            Thread.sleep(17);
+                        }
+                    }
+                }
+                long start2 = System.currentTimeMillis();
+                while (System.currentTimeMillis() - start2 <= 730) {
+                    if (checkInterruption("charging")) throw new InterruptedException();
+                }
+            } catch (InterruptedException e) {
+                if (DEBUG) Log.d(TAG, "Exception while playing animation, interrupted | name: charging");
+                if (!StatusManager.isAllLedActive()) {
+                    updateLedFrame(new int[batteryArray.length]);
+                }
+            } finally {
+                StatusManager.setAnimationActive(false);
+                if (DEBUG) Log.d(TAG, "Done playing animation | name: charging");
             }
-        } finally {
-            StatusManager.setAnimationActive(false);
-            if (DEBUG) Log.d(TAG, "Done playing animation | name: charging");
-        }
+        });
     }
 
     public static void playVolume(Handler mHandler, int volumeLevel, boolean wait, boolean increase, boolean decrease) {
         if (!check("volume", wait))
             return;
 
+        StatusManager.setVolumeLedActive(true);
         StatusManager.setAnimationActive(true);
 
         int[] volumeArray = new int[ResourceUtils.getInteger("glyph_settings_volume_levels_num")];
@@ -177,11 +185,9 @@ public final class AnimationManager {
 
         try {
             if (volumeLevel == 0) {
-                if (checkInterruption("volume")) throw new InterruptedException();
                 updateLedFrame(new int[volumeArray.length]);
                 StatusManager.setVolumeLedLast(0);
             } else if (volumeLevel > 0) {
-                if (checkInterruption("volume")) throw new InterruptedException();
                 if (last_led == 0) {
                     for (int i = 0; i <= next_led ; i++) {
                         volumeArray[i] = Constants.getBrightness();
@@ -210,10 +216,8 @@ public final class AnimationManager {
             }
             mHandler.postDelayed(() -> {
                 try {
-                    if (checkInterruption("volume")) throw new InterruptedException();
                     for (int i = volumeArray.length - 1; i >= 0; i--) {
                         if (volumeArray[i] != 0) {
-                            if (checkInterruption("volume")) throw new InterruptedException();
                             volumeArray[i] = 0;
                             updateLedFrame(volumeArray);
                             Thread.sleep(17);
@@ -233,19 +237,21 @@ public final class AnimationManager {
             }
         } finally {
             StatusManager.setAnimationActive(false);
+            StatusManager.setVolumeLedActive(false);
+
             if (DEBUG) Log.d(TAG, "Done playing animation | name: volume");
         }
     }
 
-    public static void playCall(Handler mHandler, String name) {
-        StatusManager.setCallLedEnabled(true);
+    public static void playCall(String name) {
+        submit(() -> {
+            StatusManager.setCallLedEnabled(true);
 
-        if (!check("call: " + name, true))
-            return;
+            if (!check("call: " + name, true))
+                return;
 
-        StatusManager.setCallLedActive(true);
+            StatusManager.setCallLedActive(true);
 
-        mHandler.post(() -> {
             while (StatusManager.isCallLedEnabled()) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                         ResourceUtils.getCallAnimation(name)))) {
@@ -272,22 +278,22 @@ public final class AnimationManager {
                     }
                 }
             }
+            updateLedFrame(new float[5]);
+            StatusManager.setCallLedActive(false);
+            if (DEBUG) Log.d(TAG, "Done playing animation | name: " + name);
         });
     }
 
-    public static void stopCall(Handler mHandler, String name) {
+    public static void stopCall() {
         if (DEBUG) Log.d(TAG, "Disabling Call Animation");
         StatusManager.setCallLedEnabled(false);
-        mHandler.removeCallbacksAndMessages(null);
-        updateLedFrame(new float[5]);
-        StatusManager.setCallLedActive(false);
-        if (DEBUG) Log.d(TAG, "Done playing animation | name: " + name);
     }
 
     public static void playEssential() {
         if (DEBUG) Log.d(TAG, "Playing Essential Animation");
         int led = ResourceUtils.getInteger("glyph_settings_notifs_essential_led");
         if (!StatusManager.isEssentialLedActive()) {
+            submit(() -> {
                 if (!check("essential", true))
                     return;
 
@@ -306,10 +312,12 @@ public final class AnimationManager {
                 StatusManager.setAnimationActive(false);
                 StatusManager.setEssentialLedActive(true);
                 if (DEBUG) Log.d(TAG, "Done playing animation | name: essential");
+            });
         } else {
             updateLedSingle(led, Constants.getMaxBrightness() / 100 * 7);
             return;
         }
+
     }
 
     public static void stopEssential() {
@@ -322,39 +330,41 @@ public final class AnimationManager {
     }
 
     public static void playMusic(String name) {
-        float maxBrightness = (float) Constants.getMaxBrightness();
-        float[] pattern = new float[5];
+        submit(() -> {
+            float maxBrightness = (float) Constants.getMaxBrightness();
+            float[] pattern = new float[5];
 
-        switch (name) {
-            case "low":
-                pattern[4] = maxBrightness;
-                break;
-            case "mid_low":
-                pattern[3] = maxBrightness;
-                break;
-            case "mid":
-                pattern[2] = maxBrightness;
-                break;
-            case "mid_high":
-                pattern[0] = maxBrightness;
-                break;
-            case "high":
-                pattern[1] = maxBrightness;
-                break;
-            default:
-                if (DEBUG) Log.d(TAG, "Name doesn't match any zone, returning | name: " + name);
-                return;
-        }
+            switch (name) {
+                case "low":
+                    pattern[4] = maxBrightness;
+                    break;
+                case "mid_low":
+                    pattern[3] = maxBrightness;
+                    break;
+                case "mid":
+                    pattern[2] = maxBrightness;
+                    break;
+                case "mid_high":
+                    pattern[0] = maxBrightness;
+                    break;
+                case "high":
+                    pattern[1] = maxBrightness;
+                    break;
+                default:
+                    if (DEBUG) Log.d(TAG, "Name doesn't match any zone, returning | name: " + name);
+                    return;
+            }
 
-        try {
-            updateLedFrame(pattern);
-            Thread.sleep(85);
-        } catch (Exception e) {
-            if (DEBUG) Log.d(TAG, "Exception while playing animation | name: music: " + name + " | exception: " + e);
-        } finally {
-            updateLedFrame(new float[5]);
-            if (DEBUG) Log.d(TAG, "Done playing animation | name: " + name);
-        }
+            try {
+                updateLedFrame(pattern);
+                Thread.sleep(85);
+            } catch (Exception e) {
+                if (DEBUG) Log.d(TAG, "Exception while playing animation | name: music: " + name + " | exception: " + e);
+            } finally {
+                updateLedFrame(new float[5]);
+                if (DEBUG) Log.d(TAG, "Done playing animation | name: " + name);
+            }
+        });
     }
 
     private static void updateLedFrame(String[] pattern) {
