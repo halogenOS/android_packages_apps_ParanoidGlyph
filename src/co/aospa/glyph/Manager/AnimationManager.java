@@ -122,26 +122,26 @@ public final class AnimationManager {
 
         try {
             for (int i = 0; i < batteryArray.length; i++) {
-                if (checkInterruption("charging")) throw new InterruptedException();
-                batteryArray[i] = Constants.getBrightness();
-                if (batteryDot && i == 0) continue;
-                updateLedFrame(batteryArray);
-                Thread.sleep(17);
-            }
-            for (int i = batteryArray.length - 1; i > amount - 1; i--) {
-                if (checkInterruption("charging")) throw new InterruptedException();
-                batteryArray[i] = 0;
-                updateLedFrame(batteryArray);
-                Thread.sleep(7);
+                if ( i <= amount - 1 && batteryLevel > 0) {
+                    if (checkInterruption("charging")) throw new InterruptedException();
+                    batteryArray[i] = Constants.getBrightness();
+                    if (batteryDot && i == 0) continue;
+                    updateLedFrame(batteryArray);
+                    Thread.sleep(17);
+                }
             }
             mHandler.postDelayed(() -> {
                 try {
                     if (checkInterruption("charging")) throw new InterruptedException();
-                    for (int i = amount - 1; i >= 0; i--) {
-                        if (checkInterruption("charging")) throw new InterruptedException();
-                        batteryArray[i] = 0;
-                        updateLedFrame(batteryArray);
-                        Thread.sleep(13);
+                    for (int i = batteryArray.length - 1; i >= 0; i--) {
+                        if ( i <= amount - 1 && batteryLevel > 0) {
+                            if (checkInterruption("charging")) throw new InterruptedException();
+                            if (batteryArray[i] != 0) {
+                                batteryArray[i] = 0;
+                                updateLedFrame(batteryArray);
+                                Thread.sleep(17);
+                            }
+                        }
                     }
                 } catch (InterruptedException e) {
                     if (DEBUG) Log.d(TAG, "Exception while playing animation, interrupted | name: charging");
