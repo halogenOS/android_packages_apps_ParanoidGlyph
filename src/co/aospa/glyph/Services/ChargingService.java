@@ -128,7 +128,7 @@ public class ChargingService extends Service {
         mThreadHandler.post(() -> {
             AnimationManager.playCharging(getBatteryLevel(), wait);
         });
-        mThreadHandler.postDelayed(dismissCharging, 1250);
+        mThreadHandler.postDelayed(dismissCharging, 1000);
     }
 
     private final BroadcastReceiver mPowerMonitor = new BroadcastReceiver() {
