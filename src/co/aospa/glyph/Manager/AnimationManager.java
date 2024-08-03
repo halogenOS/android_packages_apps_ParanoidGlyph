@@ -190,7 +190,7 @@ public final class AnimationManager {
         }
     }
 
-    public static void playVolume(int volumeLevel, boolean wait) {
+    public synchronized static void playVolume(int volumeLevel, boolean wait) {
         if (!check("volume", wait))
             return;
 
@@ -208,7 +208,7 @@ public final class AnimationManager {
                     StatusManager.setVolumeLedLast(i);
                     lastArray[i] = 0;
                     updateLedFrame(lastArray);
-                    Thread.sleep(16, 666000);
+                    AnimationManager.class.wait(24);
                 }
             } else {
                 if (last == 0) {
@@ -217,7 +217,7 @@ public final class AnimationManager {
                         StatusManager.setVolumeLedLast(i);
                         volumeArray[i] = Constants.MAX_PATTERN_BRIGHTNESS;
                         updateLedFrame(volumeArray);
-                        Thread.sleep(16, 666000);
+                        AnimationManager.class.wait(24);
                     }
                 } else {
                     if (last <= amount) {
@@ -226,7 +226,7 @@ public final class AnimationManager {
                             StatusManager.setVolumeLedLast(i);
                             lastArray[i] = Constants.MAX_PATTERN_BRIGHTNESS;
                             updateLedFrame(lastArray);
-                            Thread.sleep(16, 666000);
+                            AnimationManager.class.wait(24);
                         }
                     } else if (last > amount) {
                         for (int i = last; i > amount; i--) {
@@ -234,7 +234,7 @@ public final class AnimationManager {
                             StatusManager.setVolumeLedLast(i);
                             lastArray[i] = 0;
                             updateLedFrame(lastArray);
-                            Thread.sleep(16, 666000);
+                            AnimationManager.class.wait(24);
                         }
                     }
                 }
@@ -253,7 +253,7 @@ public final class AnimationManager {
         }
     }
 
-    public static void dismissVolume() {
+    public synchronized static void dismissVolume() {
         if (StatusManager.getVolumeLevelLast() == 0 
             || StatusManager.getVolumeArrayLast() == null)
             return;
@@ -273,7 +273,7 @@ public final class AnimationManager {
                     StatusManager.setVolumeLedLast(i);
                     volumeArrayLast[i] = 0;
                     updateLedFrame(volumeArrayLast);
-                    Thread.sleep(16, 666000);
+                    AnimationManager.class.wait(24);
                 }
             }
         } catch (InterruptedException e) {
