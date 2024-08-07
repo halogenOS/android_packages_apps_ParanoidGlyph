@@ -190,29 +190,25 @@ public final class AnimationManager {
         }
     }
 
-    public static void playVolume(int volumeLevel, boolean wait) {
+    public static void playVolume(int volumeLevel, boolean wait, boolean increase, boolean decrease) {
         if (!check("volume", wait))
             return;
 
         StatusManager.setAnimationActive(true);
 
         int[] volumeArray = new int[ResourceUtils.getInteger("glyph_settings_volume_levels_num")];
-        int amount = (int) (Math.floor((volumeLevel / 100D) * (volumeArray.length - 1)));
+        int amount = (int) (Math.floor((volumeLevel / 100D) * (volumeArray.length - 1)) + 1);
         int last = StatusManager.getVolumeLedLast();
-        int[] lastArray = StatusManager.getVolumeArrayLast();
+        int next = amount - 1;
 
         try {
-             if (volumeLevel == 0) {
-                for (int i = last; i >= 0; i--) {
-                    if (checkInterruption("volume")) throw new InterruptedException();
-                    StatusManager.setVolumeLedLast(i);
-                    lastArray[i] = 0;
-                    updateLedFrame(lastArray);
-                    Thread.sleep(16, 666000);
-                }
+            if (volumeLevel == 0) {
+                if (checkInterruption("volume")) throw new InterruptedException();
+                StatusManager.setVolumeLedLast(0);
+                updateLedFrame(new int[volumeArray.length]);
             } else {
                 if (last == 0) {
-                    for (int i = 0; i <= amount; i++) {
+                    for (int i = 0; i <= next; i++) {
                         if (checkInterruption("volume")) throw new InterruptedException();
                         StatusManager.setVolumeLedLast(i);
                         volumeArray[i] = Constants.MAX_PATTERN_BRIGHTNESS;
@@ -220,16 +216,17 @@ public final class AnimationManager {
                         Thread.sleep(16, 666000);
                     }
                 } else {
-                    if (last <= amount) {
-                        for (int i = last; i <= amount; i++) {
+                    int[] lastArray = StatusManager.getVolumeArrayLast();
+                    if (increase) {
+                        for (int i = last; i <= next; i++) {
                             if (checkInterruption("volume")) throw new InterruptedException();
                             StatusManager.setVolumeLedLast(i);
                             lastArray[i] = Constants.MAX_PATTERN_BRIGHTNESS;
                             updateLedFrame(lastArray);
                             Thread.sleep(16, 666000);
                         }
-                    } else if (last > amount) {
-                        for (int i = last; i > amount; i--) {
+                    } else if (decrease) {
+                        for (int i = last; i >= amount; i--) {
                             if (checkInterruption("volume")) throw new InterruptedException();
                             StatusManager.setVolumeLedLast(i);
                             lastArray[i] = 0;
@@ -237,10 +234,9 @@ public final class AnimationManager {
                             Thread.sleep(16, 666000);
                         }
                     }
+                    volumeArray = lastArray;
                 }
             }
-            if (last > 0)
-                volumeArray = lastArray;
         } catch (InterruptedException e) {
             if (DEBUG) Log.d(TAG, "Exception while playing animation, interrupted | name: volume");
             if (!StatusManager.isAllLedActive())
