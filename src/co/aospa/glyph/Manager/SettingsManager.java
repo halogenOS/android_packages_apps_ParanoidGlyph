@@ -56,8 +56,8 @@ public final class SettingsManager {
             Log.e(TAG, "Context is not initialized");
             return false;
         }
-        return Settings.Secure.getInt(context.getContentResolver(),
-                Constants.GLYPH_ENABLE, 1) != 0;
+        return (Settings.Secure.getInt(context.getContentResolver(),Constants.GLYPH_ENABLE, 1) != 0 
+            || PreferenceManager.getDefaultSharedPreferences(context).getBoolean(Constants.GLYPH_ENABLE, false));
     }
 
     public static boolean isGlyphFlipEnabled() {
